@@ -139,38 +139,42 @@ export function DesktopMoreMenu({
                 el = el.offsetParent as HTMLElement;
             }
 
-            const buttonHeight = buttonRef.current.offsetHeight;
             const buttonWidth = buttonRef.current.offsetWidth;
+            const buttonHeight = buttonRef.current.offsetHeight;
+            const containerWidth = containerRef.current.offsetWidth;
             const containerHeight = containerRef.current.offsetHeight;
 
-            const spaceBelow = containerHeight - (top + buttonHeight) - 20;
-            const spaceAbove = top - 20;
+            // In rotated mode (90deg CW):
+            // Landscape Vertical Axis = Container X Axis (left in code)
+            // Landscape Horizontal Axis = Container Y Axis (top in code)
+
+            // Visual available space in landscape:
+            // Top of landscape is Container Left (x=0)
+            // Bottom of landscape is Container Right (x=H_cont)
+            const spaceToLandscapeTop = left;
+            const spaceToLandscapeBottom = containerWidth - (left + buttonWidth);
 
             const estimatedMenuHeight = 450;
             const actualMenuHeight = menuRef.current?.offsetHeight || estimatedMenuHeight;
 
-            const openUpward = spaceBelow < Math.min(actualMenuHeight, 300) && spaceAbove > spaceBelow;
+            const openUpward = spaceToLandscapeBottom < Math.min(actualMenuHeight, 300) && spaceToLandscapeTop > spaceToLandscapeBottom;
             const maxHeight = openUpward
-                ? Math.min(spaceAbove, actualMenuHeight)
-                : Math.min(spaceBelow, containerHeight * 0.7);
+                ? Math.min(spaceToLandscapeTop - 10, actualMenuHeight)
+                : Math.min(spaceToLandscapeBottom - 10, containerHeight * 0.7);
 
-            if (openUpward) {
-                setMenuPosition({
-                    top: top - 10,
-                    left: left, // Align to left side in rotated mode (no horizontal shift needed)
-                    maxHeight: `${maxHeight}px`,
-                    openUpward: true,
-                    align: 'left' // No transform needed in rotated mode
-                });
-            } else {
-                setMenuPosition({
-                    top: top + buttonHeight + 10,
-                    left: left,
-                    maxHeight: `${maxHeight}px`,
-                    openUpward: false,
-                    align: 'left'
-                });
-            }
+            // Horizontal alignment (Landscape):
+            // Landscape Right = Container Top (y=0)
+            // Landscape Left = Container Bottom (y=H_cont)
+            const isLandscapeRightHalf = top < containerHeight / 2;
+            const align = isLandscapeRightHalf ? 'left' : 'right';
+
+            setMenuPosition({
+                top: top, // Fixed horizontal container coordinate
+                left: left, // Fixed vertical container coordinate
+                maxHeight: `${maxHeight}px`,
+                openUpward: openUpward,
+                align: align
+            });
         }
     }, [containerRef, isRotated]);
 
@@ -208,15 +212,29 @@ export function DesktopMoreMenu({
             ref={menuRef}
             className={`absolute z-[2147483647] bg-[var(--glass-bg)] backdrop-blur-[25px] saturate-[180%] rounded-[var(--radius-2xl)] border border-[var(--glass-border)] shadow-[var(--shadow-md)] p-1.5 sm:p-2 w-fit min-w-[200px] sm:min-w-[240px] animate-in fade-in zoom-in-95 duration-200 overflow-y-auto`}
             style={{
-                top: isRotated
-                    ? (menuPosition.openUpward ? 'auto' : `${menuPosition.top}px`)
-                    : `${menuPosition.top}px`, // Absolute top for viewport mode
-                bottom: isRotated
-                    ? (menuPosition.openUpward ? `calc(100% - ${menuPosition.top}px + 10px)` : 'auto')
-                    : 'auto',
-                left: `${menuPosition.left}px`,
-                // If aligned right, shift left by 100% of own width. If aligned left, stay at 0.
-                transform: menuPosition.align === 'right' ? 'translateX(-100%)' : 'none',
+                ...(isRotated ? {
+                    // In Rotated Mode:
+                    // menuPosition.left is Container X (Landscape Vertical)
+                    // menuPosition.top is Container Y (Landscape Horizontal)
+
+                    // Vertical Anchoring (Above/Below Button)
+                    ...(menuPosition.openUpward ? {
+                        right: `calc(100% - ${menuPosition.left}px + 10px)`,
+                        left: 'auto'
+                    } : {
+                        left: `${menuPosition.left + buttonRef.current?.offsetWidth! + 10}px`,
+                        right: 'auto'
+                    }),
+
+                    // Horizontal Anchoring (Left/Right to Button)
+                    top: `${menuPosition.top}px`,
+                    transform: menuPosition.align === 'right' ? 'translateY(-100%)' : 'none',
+                } : {
+                    // Normal Mode
+                    top: `${menuPosition.top}px`,
+                    left: `${menuPosition.left}px`,
+                    transform: menuPosition.align === 'right' ? 'translateX(-100%)' : 'none',
+                }),
                 maxHeight: menuPosition.maxHeight,
             }}
             onMouseEnter={onMouseEnter}
